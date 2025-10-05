@@ -1,4 +1,3 @@
-# File ini bisa kosong atau berisi import dasar
 from .start import start, help_command
 from .tren import handle_text
 from .audio import handle_voice, handle_audio
