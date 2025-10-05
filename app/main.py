@@ -77,6 +77,8 @@ class TrenboltBot:
             logger.info("✅ Status handlers berhasil di-setup")
         except ImportError as e:
             logger.warning(f"⚠️ Status handlers tidak dapat di-load: {e}")
+        except Exception as e:
+            logger.warning(f"⚠️ Error setup status handlers: {e}")
     
     async def error_handler(self, update, context):
         logger.error(msg="Exception occurred:", exc_info=context.error)
@@ -87,12 +89,15 @@ class TrenboltBot:
         
         # Log AI status
         if self.google_api_key:
-            from app.services.ai_analyzer import AIAnalyzer
-            analyzer = AIAnalyzer()
-            if analyzer.is_enabled:
-                logger.info("✅ Google AI Studio: AKTIF")
-            else:
-                logger.error("❌ Google AI Studio: GAGAL INISIALISASI")
+            try:
+                from app.services.ai_analyzer import AIAnalyzer
+                analyzer = AIAnalyzer()
+                if analyzer.is_enabled:
+                    logger.info("✅ Google AI Studio: AKTIF")
+                else:
+                    logger.error("❌ Google AI Studio: GAGAL INISIALISASI")
+            except Exception as e:
+                logger.error(f"❌ Error checking AI status: {e}")
         else:
             logger.warning("⚠️ Google AI Studio: API KEY TIDAK ADA")
         
