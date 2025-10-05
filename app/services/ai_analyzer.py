@@ -23,7 +23,6 @@ class AIAnalyzer:
             logger.info("✅ Google AI configured")
             
             # Langsung gunakan model yang kita tahu berhasil
-            # Dari log sebelumnya, models/gemini-2.0-flash berhasil
             self.model = genai.GenerativeModel('models/gemini-2.0-flash')
             self.is_enabled = True
             logger.info("✅ AI Analyzer initialized with models/gemini-2.0-flash")
@@ -42,17 +41,26 @@ class AIAnalyzer:
         try:
             logger.info(f"🧠 Processing: {text[:50]}...")
             
-            # Prompt yang lebih sederhana
+            # Prompt yang lebih sederhana dengan batasan panjang
             prompt = f"""
             Anda adalah asisten AI yang helpful. Berikan respons dalam bahasa Indonesia.
+            Berikan respons yang singkat, padat, dan jelas (maksimal 500 kata).
             
             Pertanyaan/pesan: {text}
             
             Berikan respons yang ramah, informatif, dan helpful dalam bahasa Indonesia.
             """
             
-            # Generate response
-            response = self.model.generate_content(prompt)
+            # Generate response dengan batasan token
+            generation_config = {
+                "max_output_tokens": 800,  # Batasi output
+                "temperature": 0.7,
+            }
+            
+            response = self.model.generate_content(
+                prompt,
+                generation_config=generation_config
+            )
             
             logger.info("✅ AI Response received successfully")
             
