@@ -18,24 +18,16 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if google_api_key:
         try:
-            import google.generativeai as genai
-            genai.configure(api_key=os.getenv('GOOGLE_AI_STUDIO_API_KEY'))
+            from app.services.ai_analyzer import AIAnalyzer
+            analyzer = AIAnalyzer()
             
-            # List available models
-            models = genai.list_models()
-            available_models = [model.name for model in models]
-            
-            ai_status = "✅ Aktif"
-            ai_detail = f"Model tersedia: {len(available_models)}"
-            
-            # Show first few models
-            if available_models:
-                ai_detail += f"\n• {available_models[0]}"
-                if len(available_models) > 1:
-                    ai_detail += f"\n• {available_models[1]}"
-                if len(available_models) > 2:
-                    ai_detail += f"\n• ... dan {len(available_models)-2} lainnya"
-                    
+            if analyzer.is_enabled:
+                ai_status = "✅ Aktif"
+                ai_detail = "Model berhasil di-load"
+            else:
+                ai_status = "❌ Error"
+                ai_detail = "Gagal inisialisasi AI"
+                
         except Exception as e:
             ai_status = "❌ Error"
             ai_detail = f"Error: {str(e)}"
@@ -54,6 +46,41 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     
     await update.message.reply_text(status_text)
+
+async def test_ai_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Test AI dengan prompt sederhana"""
+    test_text = "Halo, ini adalah test AI. Bisakah kamu memperkenalkan diri?"
+    
+    processing_msg = await update.message.reply_text("🧠 Testing AI...")
+    
+    try:
+        from app.services.ai_analyzer import AIAnalyzer
+        analyzer = AIAnalyzer()
+        
+        if not analyzer.is_enabled:
+            await processing_msg.delete()
+            await update.message.reply_text("❌ AI tidak aktif. Cek /status untuk detail.")
+            return
+        
+        response = await analyzer.analyze_text(test_text, update.effective_user.id)
+        
+        await processing_msg.delete()
+        
+        result_text = f"""
+🧪 **Test AI Result:**
+
+**Prompt:** {test_text}
+
+**Response:**
+{response}
+
+**Status:** ✅ AI Berfungsi
+"""
+        await update.message.reply_text(result_text)
+        
+    except Exception as e:
+        await processing_msg.delete()
+        await update.message.reply_text(f"❌ AI Test Failed:\n{str(e)}")
 
 async def test_model_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Test model availability"""
