@@ -20,8 +20,8 @@ class TrenboltBot:
             logger.error("❌ TELEGRAM_BOT_TOKEN tidak ditemukan!")
             raise ValueError("TELEGRAM_BOT_TOKEN tidak ditemukan!")
         
-        if not self.google_api_key:
-            logger.warning("⚠️ GOOGLE_AI_STUDIO_API_KEY tidak ditemukan. Fitur AI akan dinonaktifkan.")
+        logger.info(f"✅ TELEGRAM_BOT_TOKEN: {'***' + self.token[-4:] if self.token else 'MISSING'}")
+        logger.info(f"✅ GOOGLE_AI_STUDIO_API_KEY: {'SET' if self.google_api_key else 'MISSING'}")
         
         self.application = Application.builder().token(self.token).build()
         
@@ -52,20 +52,31 @@ class TrenboltBot:
         # Setup admin handlers (opsional)
         self.setup_admin_handlers()
         
+        # Setup status handlers
+        self.setup_status_handlers()
+        
         # Error handler
         self.application.add_error_handler(self.error_handler)
     
     def setup_admin_handlers(self):
         """Setup admin handlers dengan error handling"""
         try:
-            # Import langsung dari file admin
-            from app.handlers.admin import admin_panel, setup_admin_handlers
+            from app.handlers.admin import setup_admin_handlers
             setup_admin_handlers(self.application)
             logger.info("✅ Admin handlers berhasil di-setup")
         except ImportError as e:
             logger.warning(f"⚠️ Admin handlers tidak dapat di-load: {e}")
         except Exception as e:
             logger.warning(f"⚠️ Error setup admin handlers: {e}")
+    
+    def setup_status_handlers(self):
+        """Setup status handlers"""
+        try:
+            from app.handlers.status import setup_status_handlers
+            setup_status_handlers(self.application)
+            logger.info("✅ Status handlers berhasil di-setup")
+        except ImportError as e:
+            logger.warning(f"⚠️ Status handlers tidak dapat di-load: {e}")
     
     async def error_handler(self, update, context):
         logger.error(msg="Exception occurred:", exc_info=context.error)
@@ -74,12 +85,22 @@ class TrenboltBot:
         self.setup_handlers()
         logger.info("🤖 Trenbolt-Bot sedang berjalan...")
         
+        # Log AI status
+        if self.google_api_key:
+            from app.services.ai_analyzer import AIAnalyzer
+            analyzer = AIAnalyzer()
+            if analyzer.is_enabled:
+                logger.info("✅ Google AI Studio: AKTIF")
+            else:
+                logger.error("❌ Google AI Studio: GAGAL INISIALISASI")
+        else:
+            logger.warning("⚠️ Google AI Studio: API KEY TIDAK ADA")
+        
         # Untuk production di Railway
         port = int(os.environ.get('PORT', 8443))
         webhook_url = os.getenv('RAILWAY_STATIC_URL')
         
         if webhook_url and self.token:
-            # Production mode dengan webhook
             logger.info(f"🌐 Production mode dengan webhook: {webhook_url}")
             try:
                 self.application.run_webhook(
@@ -93,21 +114,16 @@ class TrenboltBot:
                 logger.info("🔄 Fallback ke polling mode...")
                 self.application.run_polling()
         else:
-            # Development mode dengan polling
             logger.info("🔧 Development mode dengan polling")
             self.application.run_polling()
 
 def main():
     """Main function dengan error handling"""
     try:
-        # Initialize dan run bot
         bot = TrenboltBot()
         bot.run()
     except Exception as e:
         logger.error(f"❌ Failed to start bot: {e}")
-        logger.info("💡 Pastikan environment variables sudah di-set dengan benar:")
-        logger.info("   - TELEGRAM_BOT_TOKEN")
-        logger.info("   - GOOGLE_AI_STUDIO_API_KEY (opsional)")
 
 if __name__ == '__main__':
     main()
