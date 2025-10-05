@@ -29,54 +29,72 @@ class AIAnalyzer:
             try:
                 models = genai.list_models()
                 available_models = [model.name for model in models]
-                logger.info(f"📋 Available models: {len(available_models)} models")
+                logger.info(f"📋 Total available models: {len(available_models)}")
                 
-                # Log beberapa model yang relevan
-                gemini_models = [m for m in available_models if 'gemini' in m.lower() and 'flash' in m.lower()]
-                if gemini_models:
-                    logger.info(f"📋 Gemini Flash models: {gemini_models[:3]}")
-                    
+                # Filter hanya model yang support generateContent
+                supported_models = []
+                for model_name in available_models:
+                    for model in models:
+                        if model.name == model_name and 'generateContent' in model.supported_generation_methods:
+                            supported_models.append(model_name)
+                            break
+                
+                logger.info(f"📋 Models supporting generateContent: {len(supported_models)}")
+                
+                # Log beberapa model yang supported
+                if supported_models:
+                    logger.info(f"📋 Supported models sample: {supported_models[:5]}")
+                
             except Exception as e:
                 logger.warning(f"⚠️ Cannot list models: {e}")
+                supported_models = []
             
-            # Gunakan model yang tersedia dan recommended
-            # Berdasarkan list, gunakan models/gemini-2.0-flash atau models/gemini-flash-latest
+            # Gunakan model yang tersedia dan supported untuk generateContent
+            # Berdasarkan list Anda, gunakan model yang ada di supported_models
             preferred_models = [
                 'models/gemini-2.0-flash',
                 'models/gemini-flash-latest', 
                 'models/gemini-2.0-flash-001',
                 'models/gemini-2.0-flash-lite',
-                'models/gemini-pro-latest'
+                'models/gemini-pro-latest',
+                'models/gemini-2.5-flash',
+                'models/gemini-2.0-flash-exp'
             ]
             
             model_name = None
             for model in preferred_models:
-                try:
-                    self.model = genai.GenerativeModel(model)
-                    # Test dengan prompt sederhana
-                    test_response = self.model.generate_content("Test")
-                    model_name = model
-                    logger.info(f"✅ Successfully using model: {model}")
-                    break
-                except Exception as e:
-                    logger.warning(f"❌ Model {model} failed: {e}")
-                    continue
-            
-            if not model_name:
-                # Fallback: coba model apa saja yang ada 'flash'
-                flash_models = [m for m in available_models if 'flash' in m.lower()]
-                for model in flash_models[:3]:  # Coba 3 model flash pertama
+                if model in supported_models:
                     try:
                         self.model = genai.GenerativeModel(model)
-                        model_name = model
-                        logger.info(f"✅ Fallback to model: {model}")
-                        break
+                        # Test cepat dengan prompt sederhana
+                        test_response = self.model.generate_content("Test", request_options={"timeout": 10})
+                        if test_response.text:
+                            model_name = model
+                            logger.info(f"✅ Successfully using model: {model}")
+                            break
+                        else:
+                            logger.warning(f"⚠️ Model {model} returned empty response")
                     except Exception as e:
-                        logger.warning(f"❌ Fallback model {model} failed: {e}")
+                        logger.warning(f"❌ Model {model} failed: {e}")
                         continue
             
+            # Jika preferred models tidak bekerja, coba model supported lainnya
+            if not model_name and supported_models:
+                for model in supported_models[:5]:  # Coba 5 model supported pertama
+                    if any(flash in model for flash in ['flash', 'gemini']):  # Prioritize flash/gemini models
+                        try:
+                            self.model = genai.GenerativeModel(model)
+                            test_response = self.model.generate_content("Test", request_options={"timeout": 10})
+                            if test_response.text:
+                                model_name = model
+                                logger.info(f"✅ Fallback to supported model: {model}")
+                                break
+                        except Exception as e:
+                            logger.warning(f"❌ Supported model {model} failed: {e}")
+                            continue
+            
             if not model_name:
-                logger.error("❌ No working model found")
+                logger.error("❌ No working model found from supported models")
                 self.model = None
                 self.is_enabled = False
                 return
@@ -125,7 +143,8 @@ class AIAnalyzer:
             
             response = self.model.generate_content(
                 prompt,
-                generation_config=generation_config
+                generation_config=generation_config,
+                request_options={"timeout": 30}  # Timeout 30 detik
             )
             
             logger.info("✅ AI Response received")
