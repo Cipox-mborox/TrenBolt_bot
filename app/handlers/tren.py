@@ -82,6 +82,10 @@ async def analyze_text_ai(update: Update, text: str, user_id: int):
             await update.message.reply_text(f"{analysis}\n\nBeralih ke analisis dasar...")
             await analyze_text_basic(update, text)
         else:
+            # Potong teks jika terlalu panjang untuk Telegram
+            if len(analysis) > 4000:
+                analysis = analysis[:4000] + "\n\n... (pesan dipotong karena terlalu panjang)"
+            
             response_text = f"""
 🤖 **Hasil Analisis AI:**
 
@@ -93,6 +97,9 @@ async def analyze_text_ai(update: Update, text: str, user_id: int):
         
     except Exception as e:
         logger.error(f"AI Analysis error: {e}")
-        await processing_msg.delete()
+        try:
+            await processing_msg.delete()
+        except:
+            pass
         await update.message.reply_text("❌ Error pada analisis AI. Beralih ke analisis dasar...")
         await analyze_text_basic(update, text)
