@@ -61,12 +61,14 @@ class TrenboltBot:
             # Development mode dengan polling
             self.application.run_polling()
 
-async def init_app():
-    await init_db()
-    bot = TrenboltBot()
-    return bot
+def init_app():
+    import asyncio
+    return asyncio.run(init_db())
 
 if __name__ == '__main__':
-    import asyncio
-    bot = asyncio.run(init_app())
+    # Initialize database
+    init_app()
+    
+    # Run bot
+    bot = TrenboltBot()
     bot.run()
