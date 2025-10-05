@@ -29,41 +29,61 @@ class AIAnalyzer:
             try:
                 models = genai.list_models()
                 available_models = [model.name for model in models]
-                logger.info(f"📋 Available models: {available_models}")
+                logger.info(f"📋 Available models: {len(available_models)} models")
+                
+                # Log beberapa model yang relevan
+                gemini_models = [m for m in available_models if 'gemini' in m.lower() and 'flash' in m.lower()]
+                if gemini_models:
+                    logger.info(f"📋 Gemini Flash models: {gemini_models[:3]}")
+                    
             except Exception as e:
                 logger.warning(f"⚠️ Cannot list models: {e}")
             
-            # Coba beberapa model yang mungkin tersedia
-            model_name = None
-            possible_models = [
-                'models/gemini-1.5-pro',
-                'models/gemini-1.5-flash', 
-                'models/gemini-pro',
-                'models/gemini-pro-vision',
-                'models/gemini-1.0-pro'
+            # Gunakan model yang tersedia dan recommended
+            # Berdasarkan list, gunakan models/gemini-2.0-flash atau models/gemini-flash-latest
+            preferred_models = [
+                'models/gemini-2.0-flash',
+                'models/gemini-flash-latest', 
+                'models/gemini-2.0-flash-001',
+                'models/gemini-2.0-flash-lite',
+                'models/gemini-pro-latest'
             ]
             
-            for model in possible_models:
+            model_name = None
+            for model in preferred_models:
                 try:
                     self.model = genai.GenerativeModel(model)
+                    # Test dengan prompt sederhana
+                    test_response = self.model.generate_content("Test")
                     model_name = model
-                    logger.info(f"✅ Using model: {model}")
+                    logger.info(f"✅ Successfully using model: {model}")
                     break
                 except Exception as e:
-                    logger.warning(f"❌ Model {model} not available: {e}")
+                    logger.warning(f"❌ Model {model} failed: {e}")
                     continue
             
             if not model_name:
-                # Fallback ke model default atau coba tanpa specify model
-                try:
-                    self.model = genai.GenerativeModel()
-                    logger.info("✅ Using default model")
-                except Exception as e:
-                    logger.error(f"❌ No model available: {e}")
-                    raise
+                # Fallback: coba model apa saja yang ada 'flash'
+                flash_models = [m for m in available_models if 'flash' in m.lower()]
+                for model in flash_models[:3]:  # Coba 3 model flash pertama
+                    try:
+                        self.model = genai.GenerativeModel(model)
+                        model_name = model
+                        logger.info(f"✅ Fallback to model: {model}")
+                        break
+                    except Exception as e:
+                        logger.warning(f"❌ Fallback model {model} failed: {e}")
+                        continue
             
+            if not model_name:
+                logger.error("❌ No working model found")
+                self.model = None
+                self.is_enabled = False
+                return
+            
+            self.model_name = model_name
             self.is_enabled = True
-            logger.info("✅ Google AI Studio berhasil dikonfigurasi")
+            logger.info(f"✅ Google AI Studio berhasil dikonfigurasi dengan model: {model_name}")
             
         except ImportError as e:
             logger.error(f"❌ Package google-generativeai tidak terinstall: {e}")
@@ -83,14 +103,14 @@ class AIAnalyzer:
             return "Fitur AI tidak tersedia."
         
         try:
-            logger.info(f"🧠 Processing text: {text[:50]}...")
+            logger.info(f"🧠 Processing text with model {self.model_name}: {text[:50]}...")
             
             prompt = f"""
-            Perkenalkan diri Anda sebagai asisten AI Trenbolt-Bot dan berikan respons yang helpful dalam bahasa Indonesia.
+            Anda adalah asisten AI yang helpful. Berikan respons dalam bahasa Indonesia.
             
-            Teks pengguna: {text}
+            Pertanyaan: {text}
             
-            Berikan respons yang ramah, informatif, dan helpful dalam bahasa Indonesia.
+            Berikan respons yang informatif, ramah, dan helpful dalam bahasa Indonesia.
             """
             
             logger.info("🧠 Sending request to Google AI...")
