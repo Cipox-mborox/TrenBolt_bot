@@ -10,7 +10,6 @@ class AIAnalyzer:
         
         logger.info(f"🔧 Initializing AI Analyzer...")
         logger.info(f"🔧 API Key available: {bool(api_key)}")
-        logger.info(f"🔧 API Key length: {len(api_key) if api_key else 0}")
         
         if not api_key:
             logger.warning("⚠️ GOOGLE_AI_STUDIO_API_KEY tidak ditemukan. Fitur AI dinonaktifkan.")
@@ -26,9 +25,42 @@ class AIAnalyzer:
             genai.configure(api_key=api_key)
             logger.info("✅ Google AI configured")
             
-            # Test model availability
-            self.model = genai.GenerativeModel('gemini-pro')
-            logger.info("✅ GenerativeModel created")
+            # List available models untuk debugging
+            try:
+                models = genai.list_models()
+                available_models = [model.name for model in models]
+                logger.info(f"📋 Available models: {available_models}")
+            except Exception as e:
+                logger.warning(f"⚠️ Cannot list models: {e}")
+            
+            # Coba beberapa model yang mungkin tersedia
+            model_name = None
+            possible_models = [
+                'models/gemini-1.5-pro',
+                'models/gemini-1.5-flash', 
+                'models/gemini-pro',
+                'models/gemini-pro-vision',
+                'models/gemini-1.0-pro'
+            ]
+            
+            for model in possible_models:
+                try:
+                    self.model = genai.GenerativeModel(model)
+                    model_name = model
+                    logger.info(f"✅ Using model: {model}")
+                    break
+                except Exception as e:
+                    logger.warning(f"❌ Model {model} not available: {e}")
+                    continue
+            
+            if not model_name:
+                # Fallback ke model default atau coba tanpa specify model
+                try:
+                    self.model = genai.GenerativeModel()
+                    logger.info("✅ Using default model")
+                except Exception as e:
+                    logger.error(f"❌ No model available: {e}")
+                    raise
             
             self.is_enabled = True
             logger.info("✅ Google AI Studio berhasil dikonfigurasi")
@@ -54,26 +86,38 @@ class AIAnalyzer:
             logger.info(f"🧠 Processing text: {text[:50]}...")
             
             prompt = f"""
-            Analisis teks berikut dan berikan insights yang berguna dalam bahasa Indonesia:
+            Perkenalkan diri Anda sebagai asisten AI Trenbolt-Bot dan berikan respons yang helpful dalam bahasa Indonesia.
             
-            "{text}"
+            Teks pengguna: {text}
             
-            Format respons:
-            1. **Ringkasan** - Ringkasan singkat tentang teks
-            2. **Poin Penting** - Beberapa poin penting yang ditemukan
-            3. **Insights** - Wawasan atau analisis mendalam
-            4. **Rekomendasi** - Saran tindakan selanjutnya (jika applicable)
-            
-            Gunakan bahasa Indonesia yang natural dan mudah dipahami.
+            Berikan respons yang ramah, informatif, dan helpful dalam bahasa Indonesia.
             """
             
             logger.info("🧠 Sending request to Google AI...")
-            response = self.model.generate_content(prompt)
+            
+            # Generate content dengan configuration
+            generation_config = {
+                "temperature": 0.7,
+                "top_p": 0.8,
+                "top_k": 40,
+                "max_output_tokens": 1024,
+            }
+            
+            response = self.model.generate_content(
+                prompt,
+                generation_config=generation_config
+            )
+            
             logger.info("✅ AI Response received")
             
-            return response.text
+            # Handle response
+            if response.text:
+                return response.text
+            else:
+                logger.warning("⚠️ AI response is empty")
+                return "Maaf, saya tidak mendapatkan respons dari AI. Silakan coba lagi."
             
         except Exception as e:
             logger.error(f"❌ AI Analysis error: {e}")
             logger.error(f"❌ Error type: {type(e).__name__}")
-            return f"❌ Maaf, terjadi error saat menganalisis dengan AI: {str(e)}"
+            return f"❌ Error AI: {str(e)}"
