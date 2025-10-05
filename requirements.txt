@@ -6,6 +6,6 @@ ffmpeg-python==0.2.0
 sqlalchemy==2.0.23
 psycopg2-binary==2.9.7
 requests==2.31.0
-aiohttp==3.8.5
+aiohttp==3.9.0
 cryptography==41.0.7
-asyncpg==0.29.0  # Tambahkan untuk async PostgreSQL
+asyncpg==0.29.0
