@@ -1,13 +1,10 @@
 from telegram import Update
 from telegram.ext import ContextTypes
-from app.services.ai_analyzer import AIAnalyzer
 import logging
 
 logger = logging.getLogger(__name__)
-ai_analyzer = AIAnalyzer()
 
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
     text = update.message.text
     
     if not text or len(text.strip()) == 0:
@@ -18,27 +15,24 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     processing_msg = await update.message.reply_text("🔄 Menganalisis teks...")
     
     try:
-        # Analisis dengan AI
-        analysis = await ai_analyzer.analyze_text(text, user_id)
-        
-        # Hapus pesan processing
-        await processing_msg.delete()
-        
-        # Kirim hasil analisis
-        response_text = f"""
-📊 **Hasil Analisis:**
+        # Analisis sederhana tanpa AI
+        analysis = f"""
+📊 **Hasil Analisis Sederhana:**
 
 **Input:** {text[:100]}...
 
-**Analisis:**
-{analysis}
+**Kata-kata kunci:** {', '.join(set(text.split()[:5]))}
+**Panjang teks:** {len(text)} karakter
+**Jumlah kata:** {len(text.split())}
 
-💡 **Tips:** Gunakan fitur premium untuk analisis yang lebih mendalam!
+💡 **Tips:** Fitur AI sedang dalam pengembangan. 
+Gunakan /premium untuk info fitur lengkap.
         """
         
-        await update.message.reply_text(response_text)
+        await processing_msg.delete()
+        await update.message.reply_text(analysis)
         
     except Exception as e:
         logger.error(f"Error analyzing text: {e}")
         await processing_msg.delete()
-        await update.message.reply_text("❌ Maaf, terjadi error saat menganalisis teks. Silakan coba lagi.")
+        await update.message.reply_text("❌ Maaf, terjadi error saat menganalisis teks.")

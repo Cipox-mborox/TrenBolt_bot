@@ -37,9 +37,6 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 1. Kirim teks langsung untuk dianalisis
 2. Kirim pesan suara untuk dikonversi ke teks
 3. Gunakan fitur premium untuk analisis mendalam
-
-**Dukungan:**
-Untuk bantuan lebih lanjut, hubungi developer.
     """
     
     await update.message.reply_text(help_text)
