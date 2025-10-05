@@ -1,9 +1,7 @@
 import os
 import logging
+import asyncio
 from telegram.ext import Application, CommandHandler, MessageHandler, filters
-from app.handlers import start, tren, audio, premium, setup_admin_handlers
-from app.services.database import init_db
-from app.services.ai_analyzer import AIAnalyzer
 
 # Setup logging
 logging.basicConfig(
@@ -14,26 +12,51 @@ logger = logging.getLogger(__name__)
 
 class TrenboltBot:
     def __init__(self):
+        # Cek environment variables
         self.token = os.getenv('TELEGRAM_BOT_TOKEN')
+        self.google_api_key = os.getenv('GOOGLE_AI_STUDIO_API_KEY')
+        
         if not self.token:
+            logger.error("❌ TELEGRAM_BOT_TOKEN tidak ditemukan!")
             raise ValueError("TELEGRAM_BOT_TOKEN tidak ditemukan!")
         
+        if not self.google_api_key:
+            logger.warning("⚠️ GOOGLE_AI_STUDIO_API_KEY tidak ditemukan. Fitur AI akan dinonaktifkan.")
+        
         self.application = Application.builder().token(self.token).build()
-        self.ai_analyzer = AIAnalyzer()
+        
+        # Import handlers secara manual untuk menghindari circular imports
+        from app.handlers.start import start, help_command
+        from app.handlers.tren import handle_text
+        from app.handlers.audio import handle_voice, handle_audio
+        from app.handlers.premium import premium_info
+        
+        self.handlers = {
+            'start': start,
+            'help_command': help_command,
+            'handle_text': handle_text,
+            'handle_voice': handle_voice,
+            'handle_audio': handle_audio,
+            'premium_info': premium_info
+        }
         
     def setup_handlers(self):
         # Command handlers
-        self.application.add_handler(CommandHandler("start", start.start))
-        self.application.add_handler(CommandHandler("help", start.help_command))
-        self.application.add_handler(CommandHandler("premium", premium.premium_info))
+        self.application.add_handler(CommandHandler("start", self.handlers['start']))
+        self.application.add_handler(CommandHandler("help", self.handlers['help_command']))
+        self.application.add_handler(CommandHandler("premium", self.handlers['premium_info']))
         
         # Message handlers
-        self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, tren.handle_text))
-        self.application.add_handler(MessageHandler(filters.VOICE, audio.handle_voice))
-        self.application.add_handler(MessageHandler(filters.AUDIO, audio.handle_audio))
+        self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handlers['handle_text']))
+        self.application.add_handler(MessageHandler(filters.VOICE, self.handlers['handle_voice']))
+        self.application.add_handler(MessageHandler(filters.AUDIO, self.handlers['handle_audio']))
         
         # Admin handlers
-        setup_admin_handlers(self.application)
+        try:
+            from app.handlers import setup_admin_handlers
+            setup_admin_handlers(self.application)
+        except ImportError as e:
+            logger.warning(f"⚠️ Admin handlers tidak dapat di-load: {e}")
         
         # Error handler
         self.application.add_error_handler(self.error_handler)
@@ -43,7 +66,7 @@ class TrenboltBot:
     
     def run(self):
         self.setup_handlers()
-        logger.info("Bot sedang berjalan...")
+        logger.info("🤖 Trenbolt-Bot sedang berjalan...")
         
         # Untuk production di Railway
         port = int(os.environ.get('PORT', 8443))
@@ -51,6 +74,7 @@ class TrenboltBot:
         
         if webhook_url:
             # Production mode dengan webhook
+            logger.info(f"🌐 Production mode dengan webhook: {webhook_url}")
             self.application.run_webhook(
                 listen="0.0.0.0",
                 port=port,
@@ -59,16 +83,20 @@ class TrenboltBot:
             )
         else:
             # Development mode dengan polling
+            logger.info("🔧 Development mode dengan polling")
             self.application.run_polling()
 
-def init_app():
-    import asyncio
-    return asyncio.run(init_db())
+def main():
+    """Main function dengan error handling"""
+    try:
+        # Initialize dan run bot
+        bot = TrenboltBot()
+        bot.run()
+    except Exception as e:
+        logger.error(f"❌ Failed to start bot: {e}")
+        logger.info("💡 Pastikan environment variables sudah di-set dengan benar:")
+        logger.info("   - TELEGRAM_BOT_TOKEN")
+        logger.info("   - GOOGLE_AI_STUDIO_API_KEY (opsional)")
 
 if __name__ == '__main__':
-    # Initialize database
-    init_app()
-    
-    # Run bot
-    bot = TrenboltBot()
-    bot.run()
+    main()
